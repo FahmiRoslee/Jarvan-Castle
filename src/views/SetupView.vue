@@ -147,7 +147,8 @@ async function createNew() {
 // ---------- Step 2: the CLI ----------
 
 async function checkCli() {
-  form.cliCheck = await attempt(`Looking for ${form.cli === 'codex' ? 'Codex' : 'Claude Code'}…`, () => setupCheckCli(form.cli))
+  const app = { claude: 'Claude Code', codex: 'Codex', pi: 'pi' }[form.cli] ?? 'Claude Code'
+  form.cliCheck = await attempt(`Looking for ${app}…`, () => setupCheckCli(form.cli))
 }
 
 function pickCli(cli) {
@@ -314,6 +315,9 @@ onMounted(async () => {
           </button>
           <button class="card" :class="{ picked: form.cli === 'codex' }" @click="pickCli('codex')">
             <strong>Codex</strong><span>Your ChatGPT account. Draws pictures by itself.</span>
+          </button>
+          <button class="card" :class="{ picked: form.cli === 'pi' }" @click="pickCli('pi')">
+            <strong>pi</strong><span>Any provider pi supports - Mistral, Anthropic, OpenAI and more. Pictures need a ChatGPT key.</span>
           </button>
         </div>
         <div v-if="form.cliCheck" class="check">
