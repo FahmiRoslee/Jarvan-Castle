@@ -38,8 +38,9 @@ pub fn find_in(command: &str, folders: impl IntoIterator<Item = PathBuf>, pathex
 pub fn image_mode(cli: Cli, has_openai_key: bool) -> &'static str {
     match (cli, has_openai_key) {
         (Cli::Codex, _) => "codex",
-        (Cli::Claude, true) => "openai",
-        (Cli::Claude, false) => "none",
+        // pi has no image tool of its own, so it takes the same road as Claude Code
+        (_, true) => "openai",
+        (_, false) => "none",
     }
 }
 

@@ -329,13 +329,14 @@ onMounted(async () => {
         <div class="row">
           <button :class="{ primary: settings.cli === 'claude' }" @click="switchCli('claude')">Claude Code</button>
           <button :class="{ primary: settings.cli === 'codex' }" @click="switchCli('codex')">Codex</button>
+          <button :class="{ primary: settings.cli === 'pi' }" @click="switchCli('pi')">pi</button>
           <span v-if="cliCheck && !cliCheck.installed" class="warn">{{ cliCheck.label }} is not installed: <code>{{ cliCheck.installCommand }}</code></span>
         </div>
-        <label v-if="settings.cli === 'claude'" class="only-this">
+        <label v-if="settings.cli !== 'codex'" class="only-this">
           <input type="checkbox" :checked="!!settings.onlyThisCompanion" @change="save({ onlyThisCompanion: $event.target.checked }, 'Saved. It takes effect the next time ' + (settings.companionName ?? 'your companion') + ' wakes.')" />
           <span>
             Only {{ settings.companionName ?? 'this companion' }} in Castle
-            <small>Leave out my personal Claude Code setup (its own CLAUDE.md, hooks and plugins) in Castle's session. Turn this on when that setup is another companion, or to test with a clean one.</small>
+            <small>Leave out my personal {{ settings.cli === 'pi' ? 'pi' : 'Claude Code' }} setup (its own {{ settings.cli === 'pi' ? 'AGENTS.md, skills and extensions' : 'CLAUDE.md, hooks and plugins' }}) in Castle's session. Turn this on when that setup is another companion, or to test with a clean one.</small>
           </span>
         </label>
         <h3>Names</h3>

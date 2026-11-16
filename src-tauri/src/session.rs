@@ -144,8 +144,14 @@ pub struct Boot {
 /// no such option, so it gets none and loads the memory itself. Keeping the personal setup out is
 /// `isolation_args`, which does not depend on a boot file.
 pub fn wake_args(cli: Cli, boot: Option<&Boot>) -> Vec<String> {
-    let (Cli::Claude, Some(boot)) = (cli, boot) else { return Vec::new() };
-    vec!["--append-system-prompt-file".to_string(), boot.file.display().to_string()]
+    let Some(boot) = boot else { return Vec::new() };
+    let flag = match cli {
+        Cli::Claude => "--append-system-prompt-file",
+        // pi's flag takes the path itself (`--append-system-prompt <text|path>`)
+        Cli::Pi => "--append-system-prompt",
+        Cli::Codex => return Vec::new(),
+    };
+    vec![flag.to_string(), boot.file.display().to_string()]
 }
 
 /// Castle's own list of MCP servers for a session that is only this companion: empty, so no server
@@ -177,6 +183,19 @@ pub fn isolation_args(cli: Cli, mcp_config: &Path) -> Vec<String> {
 /// The same, with Castle's own session settings (its status line) given by `--settings` when there
 /// is a file for it.
 pub fn isolation_args_with(cli: Cli, mcp_config: &Path, session_settings: Option<&Path>) -> Vec<String> {
+    if cli == Cli::Pi {
+        // pi has no per-run settings file, so the personal setup is closed by flags instead: no MCP
+        // servers (Castle's own list is empty anyway), no personal skills, extensions or prompt
+        // templates, and no AGENTS.md/CLAUDE.md discovery - the folder's own travels in the boot
+        // file, exactly as it does for Claude Code. The built-in extensions this turns off
+        // (mcp, llama.cpp, codemode, tool-search) are none a Castle session needs.
+        // shortcut: pi has no "project settings only" switch, so a personal extension is out by
+        // --no-extensions rather than by scope; upgrade if pi grows a --setting-sources equivalent.
+        return ["--no-mcp", "--no-skills", "--no-extensions", "--no-prompt-templates", "--no-context-files"]
+            .iter()
+            .map(|a| a.to_string())
+            .collect();
+    }
     if cli != Cli::Claude {
         return Vec::new();
     }
@@ -245,20 +264,24 @@ pub fn isolation_vars(cli: Cli) -> Vec<(String, String)> {
 /// A folder's own instructions - its `CLAUDE.md`, `.claude/CLAUDE.md` and `CLAUDE.local.md` - for a
 /// boot file, since an isolated session reads no CLAUDE.md by itself. Only the folder itself, never
 /// the folders above it (where someone's personal files may live). None when it has none.
-pub fn folder_instructions(folder: &Path) -> Option<String> {
-    let parts: Vec<String> = ["CLAUDE.md", ".claude/CLAUDE.md", "CLAUDE.local.md"]
+pub fn folder_instructions(folder: &Path, cli: Cli) -> Option<String> {
+    let (names, title) = match cli {
+        Cli::Claude => (["CLAUDE.md", ".claude/CLAUDE.md", "CLAUDE.local.md"], "CLAUDE.md"),
+        _ => (["AGENTS.md", ".pi/AGENTS.md", "AGENTS.local.md"], "AGENTS.md"),
+    };
+    let parts: Vec<String> = names
         .iter()
         .filter_map(|name| std::fs::read_to_string(folder.join(name)).ok())
         .map(|text| text.trim().to_string())
         .filter(|text| !text.is_empty())
         .collect();
-    (!parts.is_empty()).then(|| format!("# This folder's own instructions (its CLAUDE.md)\n\n{}", parts.join("\n\n")))
+    (!parts.is_empty()).then(|| format!("# This folder's own instructions (its {title})\n\n{}", parts.join("\n\n")))
 }
 
 /// The boot file of a room that has no other boot: its folder's own instructions, so an isolated
 /// session still hears them (the main room without names, the STORY room's rules).
-fn room_instructions_boot(store: &SettingsStore, room: Room, folder: &Path) -> Option<Boot> {
-    let text = folder_instructions(folder)?;
+fn room_instructions_boot(store: &SettingsStore, room: Room, folder: &Path, cli: Cli) -> Option<Boot> {
+    let text = folder_instructions(folder, cli)?;
     let name = if room == Room::Story { "story.md" } else { "main.md" };
     let file = store.folder().join("boot").join(name);
     std::fs::create_dir_all(file.parent()?).ok()?;
@@ -280,7 +303,7 @@ pub fn isolation_with_status(store: &SettingsStore, cli: Cli, on: bool, tools: &
 }
 
 fn isolation_inner(store: &SettingsStore, cli: Cli, on: bool, tools: Option<&Path>) -> Result<(Vec<String>, Vec<(String, String)>), String> {
-    if !on || cli != Cli::Claude {
+    if !on || cli == Cli::Codex {
         return Ok((Vec::new(), Vec::new()));
     }
     let mcp = ensure_mcp_config(store).ok_or("Castle could not write its settings folder, so the session was not started.")?;
@@ -304,7 +327,7 @@ pub fn wake_vars(boot: Option<&Boot>) -> Vec<(String, String)> {
 /// the companion then loads everything herself, exactly as before.
 fn prepare_boot(store: &SettingsStore, settings: &Settings, room: Room, folder: &Path) -> Option<Boot> {
     forget_boot_file(store);
-    if room != Room::Main || settings.cli != Cli::Claude {
+    if room != Room::Main || settings.cli == Cli::Codex {
         return None;
     }
     let memory = if settings.db_boot_at_wake {
@@ -352,8 +375,8 @@ pub(crate) fn wake_with_prompt(app: &AppHandle, store: &SettingsStore, host: &Pt
     // reach a member who set up before them); the member's own words outside it are untouched
     // the memory, read from the database now and handed to the CLI as it starts
     let mut boot = prepare_boot(store, &settings, room, &folder);
-    if boot.is_none() && settings.only_this_companion && settings.cli == Cli::Claude {
-        boot = room_instructions_boot(store, room, &folder);
+    if boot.is_none() && settings.only_this_companion && settings.cli != Cli::Codex {
+        boot = room_instructions_boot(store, room, &folder, settings.cli);
     }
     vars.extend(wake_vars(boot.as_ref()));
     // the personal setup stays out whenever the switch is on - in the STORY room too, and even when
@@ -582,10 +605,10 @@ mod tests {
         let project = root.join("shop");
         std::fs::create_dir_all(project.join(".claude")).unwrap();
         std::fs::write(root.join("CLAUDE.md"), "someone above").unwrap();
-        assert_eq!(folder_instructions(&project), None);
+        assert_eq!(folder_instructions(&project, Cli::Claude), None);
         std::fs::write(project.join("CLAUDE.md"), "Build with Vite.").unwrap();
         std::fs::write(project.join(".claude").join("CLAUDE.md"), "Tests with vitest.").unwrap();
-        let text = folder_instructions(&project).unwrap();
+        let text = folder_instructions(&project, Cli::Claude).unwrap();
         assert!(text.contains("Build with Vite.") && text.contains("Tests with vitest."));
         assert!(!text.contains("someone above"));
     }

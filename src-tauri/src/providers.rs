@@ -972,10 +972,11 @@ fn auth_output(cli: Cli) -> Option<std::process::Output> {
     } else {
         std::process::Command::new(program)
     };
-    let args: &[&str] = if cli == Cli::Codex {
-        &["login", "status"]
-    } else {
-        &["auth", "status", "--json"]
+    let args: &[&str] = match cli {
+        Cli::Codex => &["login", "status"],
+        Cli::Claude => &["auth", "status", "--json"],
+        // pi answers per provider and refuses without one; `authenticated` never asks it
+        Cli::Pi => return None,
     };
     command
         .args(args)
@@ -1008,6 +1009,11 @@ fn auth_output(cli: Cli) -> Option<std::process::Output> {
 }
 
 fn authenticated(cli: Cli) -> Option<bool> {
+    // pi keeps one credential per provider and `pi auth check` needs a provider named, so Castle
+    // cannot ask it a yes/no question: the credentials file is the answer, read by check_cli.
+    if cli == Cli::Pi {
+        return None;
+    }
     let out = auth_output(cli)?;
     if cli == Cli::Codex {
         Some(out.status.success())
@@ -1022,11 +1028,14 @@ fn authenticated(cli: Cli) -> Option<bool> {
 #[tauri::command]
 pub async fn providers_list() -> Result<Vec<crate::setup::CliCheck>, String> {
     tauri::async_runtime::spawn_blocking(|| {
-        [Cli::Claude, Cli::Codex]
+        Cli::ALL
             .into_iter()
             .map(|cli| {
                 let mut check = crate::setup::check_cli(cli);
-                check.signed_in = authenticated(cli);
+                // a CLI that cannot answer keeps the credentials-file answer check_cli gave
+                if let Some(signed_in) = authenticated(cli) {
+                    check.signed_in = Some(signed_in);
+                }
                 check
             })
             .collect()

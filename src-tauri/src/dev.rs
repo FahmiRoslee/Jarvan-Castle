@@ -110,7 +110,7 @@ fn save(store: &SettingsStore, change: impl FnOnce(&mut Settings)) -> Result<(),
 fn prepare_boot(store: &SettingsStore, settings: &Settings, slot: usize, project: &Path) -> Option<(PathBuf, bool)> {
     let file = dev_tabs::boot_file(&store.folder(), slot);
     let _ = std::fs::remove_file(&file);
-    if settings.cli != Cli::Claude {
+    if settings.cli == Cli::Codex {
         return None;
     }
     let memory_folder = settings.memory_folder.as_deref().map(PathBuf::from);
@@ -124,9 +124,9 @@ fn prepare_boot(store: &SettingsStore, settings: &Settings, slot: usize, project
         &dev_tabs::name_of(&project.display().to_string()),
         memory.is_some(),
     );
-    // an isolated session reads no CLAUDE.md by itself, so the project's own travels here
+    // an isolated session reads no CLAUDE.md / AGENTS.md by itself, so the project's own travels here
     let mut text = block;
-    if let Some(instructions) = session::folder_instructions(project) {
+    if let Some(instructions) = session::folder_instructions(project, settings.cli) {
         text = format!("{text}\n\n{instructions}");
     }
     if let Some(memory) = &memory {

@@ -16,6 +16,7 @@ pub enum Cli {
     #[default]
     Claude,
     Codex,
+    Pi,
 }
 
 impl Cli {
@@ -24,6 +25,7 @@ impl Cli {
         match self {
             Cli::Claude => "claude",
             Cli::Codex => "codex",
+            Cli::Pi => "pi",
         }
     }
 
@@ -32,8 +34,12 @@ impl Cli {
         match self {
             Cli::Claude => "Claude Code",
             Cli::Codex => "Codex",
+            Cli::Pi => "pi",
         }
     }
+
+    /// Every CLI Castle can run, in the order the settings screen lists them.
+    pub const ALL: [Cli; 3] = [Cli::Claude, Cli::Codex, Cli::Pi];
 }
 
 /// A button the member added to the quick-action row: its label and the words it types.

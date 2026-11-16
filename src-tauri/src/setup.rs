@@ -299,6 +299,11 @@ fn credentials_file(cli: Cli) -> Option<PathBuf> {
     Some(match cli {
         Cli::Claude => home.join(".claude").join(".credentials.json"),
         Cli::Codex => std::env::var_os("CODEX_HOME").filter(|v| !v.is_empty()).map(PathBuf::from).unwrap_or_else(|| home.join(".codex")).join("auth.json"),
+        Cli::Pi => std::env::var_os("PI_CODING_AGENT_DIR")
+            .filter(|v| !v.is_empty())
+            .map(PathBuf::from)
+            .unwrap_or_else(|| home.join(".pi").join("agent"))
+            .join("auth.json"),
     })
 }
 
@@ -308,6 +313,10 @@ pub fn check_cli(cli: Cli) -> CliCheck {
     let (install_command, sign_in_hint) = match cli {
         Cli::Claude => ("npm install -g @anthropic-ai/claude-code", "Open the Log, type /login and follow the browser."),
         Cli::Codex => ("npm install -g @openai/codex", "Run `codex login` once (the Log can do it) and sign in with your ChatGPT account."),
+        Cli::Pi => (
+            "npm install -g @earendil-works/pi-coding-agent",
+            "Run `pi auth login` once (the Log can do it) and sign in with your provider.",
+        ),
     };
     CliCheck {
         cli,

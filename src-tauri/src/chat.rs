@@ -63,6 +63,7 @@ pub(crate) fn newest_record(cli: Cli, folder: &Path, started: SystemTime) -> Opt
             claude::newest_record(&records, started).map(|path| (path, claude::follower as fn(PathBuf, SystemTime) -> Follower))
         }
         Cli::Codex => transcript::codex::newest_record(folder, started).map(|path| (path, transcript::codex::follower as fn(PathBuf, SystemTime) -> Follower)),
+        Cli::Pi => transcript::pi::newest_record(folder, started).map(|path| (path, transcript::pi::follower as fn(PathBuf, SystemTime) -> Follower)),
     }
 }
 

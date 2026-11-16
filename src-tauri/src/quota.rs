@@ -357,6 +357,8 @@ pub async fn cli_quota(store: State<'_, SettingsStore>) -> Result<Option<Quota>,
     let answer = tauri::async_runtime::spawn_blocking(move || match cli {
         Cli::Claude => claude_quota(),
         Cli::Codex => cached(&CODEX_GLOW, codex_quota),
+        // pi reports no weekly limit of its own: the gauge stays empty rather than guessing
+        Cli::Pi => None,
     })
     .await
     .unwrap_or(None);

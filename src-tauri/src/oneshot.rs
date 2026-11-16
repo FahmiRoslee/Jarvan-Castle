@@ -35,6 +35,16 @@ pub fn run(cli: Cli, folder: &Path, rules_file: &str, words: &str, limit: Durati
         Cli::Claude => command.args(["-p", "--tools", "", "--strict-mcp-config", "--setting-sources", "project", "--output-format", "text", "--system-prompt-file", rules_file]),
         // Codex reads AGENTS.md in this folder as its instructions
         Cli::Codex => command.args(["exec", "--sandbox", "read-only", "--skip-git-repo-check", "--output-last-message"]).arg(&answer_file).arg("-"),
+        // no tools, no MCP, no personal skills/extensions/templates, and the rules file replaces
+        // pi's own prompt (`--system-prompt <text|path>` takes the path)
+        Cli::Pi => command.args(["-p", "--mode", "text", "--system-prompt"]).arg(rules_file).args([
+            "--no-tools",
+            "--no-mcp",
+            "--no-skills",
+            "--no-extensions",
+            "--no-prompt-templates",
+            "--no-context-files",
+        ]),
     };
     command.current_dir(folder).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped());
     for name in NEVER_INHERITED {
